@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "FinanzAI",
+    "slug": "FinanzAI",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "finanzai",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1A5276"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.finanzai.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1A5276"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.finanzai.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "./plugins/withAndroidNotificationListener"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
