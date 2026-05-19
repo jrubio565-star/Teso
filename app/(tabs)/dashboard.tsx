@@ -9,10 +9,12 @@ function formatCOP(amount: number): string {
 }
 
 function ProgressBar({ percentage, color }: { percentage: number; color: string }) {
+  const [barWidth, setBarWidth] = React.useState(0);
   const clampedPct = Math.min(percentage, 100);
+  const fillWidth = barWidth * (clampedPct / 100);
   return (
-    <View style={styles.progressBarBg}>
-      <View style={[styles.progressBarFill, { width: `${clampedPct}%`, backgroundColor: color }]} />
+    <View style={styles.progressBarBg} onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}>
+      <View style={[styles.progressBarFill, { width: fillWidth, backgroundColor: color }]} />
     </View>
   );
 }
@@ -63,7 +65,6 @@ export default function DashboardScreen() {
           <Text style={styles.title}>Tu Resumen de Abril</Text>
         </View>
 
-        {/* Balance Card */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceRow}>
             <View style={styles.balanceItem}>
@@ -91,19 +92,14 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Android notification permission banner */}
         <NotificationPermissionBanner />
 
-        {/* Budget Progress */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            📊 Progreso del Presupuesto
-          </Text>
+          <Text style={styles.sectionTitle}>📊 Progreso del Presupuesto</Text>
           <Text style={styles.sectionSubtitle}>
             {activeBudget?.name || 'Sin presupuesto activo'}
           </Text>
 
-          {/* Overall progress */}
           <View style={styles.overallProgress}>
             <View style={styles.overallRow}>
               <Text style={styles.overallLabel}>Gastado del total</Text>
@@ -117,13 +113,11 @@ export default function DashboardScreen() {
             />
           </View>
 
-          {/* Categories */}
           {stats.categoryBreakdown.map((item) => (
             <CategoryCard key={item.categoryId} item={item} />
           ))}
         </View>
 
-        {/* Quick Insights */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💡 Insights de FinanzAI</Text>
           <View style={styles.insightCard}>
@@ -241,7 +235,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressBarFill: {
-    height: '100%',
+    height: 8,
     borderRadius: 4,
   },
 
