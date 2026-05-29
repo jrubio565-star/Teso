@@ -16,6 +16,7 @@ export interface Budget {
   id: string;
   userId: string;
   name: string;
+  description?: string;
   type: BudgetType;
   totalLimit: number;
   currency: string;

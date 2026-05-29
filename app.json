@@ -31,7 +31,8 @@
     },
     "plugins": [
       "expo-router",
-      "./plugins/withAndroidNotificationListener"
+      "./plugins/withAndroidNotificationListener",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
