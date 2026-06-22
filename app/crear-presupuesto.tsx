@@ -31,7 +31,7 @@ export default function CrearPresupuesto() {
 
     addBudget(nuevoBudget);
     setActiveBudget(nuevoBudget);
-    router.push('/chat');
+    router.push('/configurar-categorias');
   };
 
   return (

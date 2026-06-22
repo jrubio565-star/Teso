@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { colors, spacing, borderRadius, fontSize } from '../src/theme/colors';
 import { useStore } from '../src/store/useStore';
 import { sendMessageToAgent, chatToAnthropicHistory } from '../src/services/aiAgent';
-import { hasApiKey } from '../src/services/config';
+import { hasApiKey, saveApiKey } from '../src/services/config';
 import type { ChatMessage, Category } from '../src/types';
 
 const CATEGORY_COLORS = ['#FF6B6B', '#4ECDC4', '#9B59B6', '#3498DB', '#2ECC71', '#F1C40F', '#E74C3C', '#95A5A6'];
@@ -41,6 +41,64 @@ function TypingIndicator() {
   );
 }
 
+function ApiKeyModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const [keyInput, setKeyInput] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!keyInput.trim()) return;
+    setSaving(true);
+    try {
+      await saveApiKey(keyInput.trim());
+      setKeyInput('');
+      onClose();
+    } catch {
+      // handle error
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay2}>
+        <View style={styles.modalContent2}>
+          <Text style={styles.modalTitle2}>🔑 Configurar API Key</Text>
+          <Text style={styles.modalDescription}>
+            Para activar el agente de IA, necesitas una API key de Anthropic.
+            Puedes obtenerla en console.anthropic.com
+          </Text>
+          <TextInput
+            style={styles.apiKeyInput}
+            value={keyInput}
+            onChangeText={setKeyInput}
+            placeholder="sk-ant-api03-..."
+            placeholderTextColor={colors.textTertiary}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <View style={styles.modalButtons2}>
+            <TouchableOpacity style={styles.modalCancelButton2} onPress={onClose}>
+              <Text style={styles.modalCancelText2}>Después</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalSaveButton2, !keyInput.trim() && styles.modalSaveDisabled2]}
+              onPress={handleSave}
+              disabled={!keyInput.trim() || saving}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={styles.modalSaveText2}>Guardar</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function AddCategoryModal({ visible, onClose, onAdd }: {
   visible: boolean;
   onClose: () => void;
@@ -53,12 +111,7 @@ function AddCategoryModal({ visible, onClose, onAdd }: {
 
   const handleAdd = () => {
     if (!nombre.trim()) return;
-    onAdd({
-      name: nombre.trim(),
-      icon,
-      color,
-      monthlyLimit: parseFloat(limite) || 0,
-    });
+    onAdd({ name: nombre.trim(), icon, color, monthlyLimit: parseFloat(limite) || 0 });
     setNombre('');
     setLimite('');
     onClose();
@@ -136,12 +189,18 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKeyLoaded, setApiKeyLoaded] = useState(false);
   const { chatMessages, addChatMessage, activeBudget, addCategory } = useStore();
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     if (!activeBudget) router.replace('/');
   }, [activeBudget]);
+
+  useEffect(() => {
+    setApiKeyLoaded(true);
+  }, []);
 
   const handleSend = async () => {
     if (!inputText.trim() || isLoading) return;
@@ -161,7 +220,7 @@ export default function ChatScreen() {
         const fallback: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: 'Para usar el agente de IA necesitas configurar tu API key. Ve a la pantalla de configuración.',
+          content: '🔑 Para usar el agente de IA necesitas configurar tu API key. Toca el botón 🔑 arriba.',
           timestamp: new Date().toISOString(),
         };
         addChatMessage(fallback);
@@ -206,18 +265,37 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-    <TouchableOpacity onPress={() => router.replace('/(tabs)/')} style={styles.backBtn}>
-        <Text style={styles.backText}>🏠</Text>
-    </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)/')} style={styles.backBtn}>
+          <Text style={styles.backText}>🏠</Text>
+        </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>{activeBudget?.name || 'FinanzAI'}</Text>
           <Text style={styles.headerSubtitle}>
             {hasApiKey() ? '● Agente IA activo' : '○ Modo demo'}
           </Text>
         </View>
+        {apiKeyLoaded && (
+          <TouchableOpacity
+            style={styles.configButton}
+            onPress={() => setShowApiKeyModal(true)}
+          >
+            <Text style={styles.configButtonText}>🔑</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Categorías */}
+      {!hasApiKey() && apiKeyLoaded && (
+        <TouchableOpacity
+          style={styles.apiKeyBanner}
+          onPress={() => setShowApiKeyModal(true)}
+        >
+          <Text style={styles.apiKeyBannerText}>
+            💡 Configura tu API key para activar el agente de IA real
+          </Text>
+          <Text style={styles.apiKeyBannerArrow}>→</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.categoriesBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
           {activeBudget?.categories.map((cat) => (
@@ -291,6 +369,11 @@ export default function ChatScreen() {
         onClose={() => setShowAddCategory(false)}
         onAdd={handleAddCategory}
       />
+
+      <ApiKeyModal
+        visible={showApiKeyModal}
+        onClose={() => setShowApiKeyModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -309,11 +392,32 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   backBtn: { padding: spacing.xs },
-  backText: { fontSize: 28, color: colors.primary, fontWeight: '600' },
+  backText: { fontSize: 22 },
   headerCenter: { flex: 1 },
   headerTitle: { fontSize: fontSize.xl, fontWeight: '700', color: colors.primary },
   headerSubtitle: { fontSize: fontSize.sm, color: colors.textSecondary },
-
+  configButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  configButtonText: { fontSize: 18 },
+  apiKeyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FDE68A',
+  },
+  apiKeyBannerText: { flex: 1, fontSize: fontSize.sm, color: '#92400E', fontWeight: '500' },
+  apiKeyBannerArrow: { fontSize: fontSize.lg, color: '#92400E' },
   categoriesBar: {
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
@@ -342,7 +446,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   addCategoryText: { fontSize: fontSize.xs, fontWeight: '600', color: colors.primaryLight },
-
   chatContainer: { flex: 1 },
   messagesList: { padding: spacing.md, paddingBottom: spacing.sm },
   messageBubble: {
@@ -376,7 +479,6 @@ const styles = StyleSheet.create({
   userTimestamp: { color: 'rgba(255,255,255,0.6)' },
   typingBubble: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   typingText: { fontSize: fontSize.sm, color: colors.textSecondary, fontStyle: 'italic' },
-
   quickActions: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -392,7 +494,6 @@ const styles = StyleSheet.create({
     borderColor: colors.primaryLight,
   },
   quickActionText: { fontSize: fontSize.sm, color: colors.primaryLight, fontWeight: '600' },
-
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -424,8 +525,6 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: { backgroundColor: colors.border },
   sendButtonText: { fontSize: 20, color: colors.textOnPrimary },
-
-  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -492,4 +591,53 @@ const styles = StyleSheet.create({
   },
   modalSaveDisabled: { backgroundColor: colors.border },
   modalSaveText: { fontSize: fontSize.md, color: '#FFF', fontWeight: '700' },
+  modalOverlay2: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalContent2: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+  },
+  modalTitle2: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+  modalDescription: {
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: spacing.lg,
+  },
+  apiKeyInput: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: fontSize.md,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.lg,
+  },
+  modalButtons2: { flexDirection: 'row', gap: spacing.sm },
+  modalCancelButton2: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalCancelText2: { fontSize: fontSize.md, color: colors.textSecondary, fontWeight: '600' },
+  modalSaveButton2: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+  },
+  modalSaveDisabled2: { backgroundColor: colors.border },
+  modalSaveText2: { fontSize: fontSize.md, color: colors.textOnPrimary, fontWeight: '700' },
 });
