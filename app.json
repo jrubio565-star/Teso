@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "FinanzAI",
-    "slug": "FinanzAI",
+    "slug": "teso",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -32,10 +32,18 @@
     "plugins": [
       "expo-router",
       "./plugins/withAndroidNotificationListener",
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "864ad0df-0e24-47de-b0db-7b5f7cd24b3b"
+      }
+    },
+    "owner": "tesos-team"
   }
 }
