@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, Switch, Modal, TextInput, ActivityIndicator, Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { colors, spacing, borderRadius, fontSize } from '../../src/theme/colors';
 import { useStore } from '../../src/store/useStore';
 import { loadApiKey, saveApiKey, removeApiKey, hasApiKey } from '../../src/services/config';
@@ -140,6 +141,7 @@ function ApiKeyModal({ visible, currentKeySet, onClose }: {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function SettingsScreen() {
   const { user } = useStore();
+  const router = useRouter();
   const [emailSync, setEmailSync] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [notifListener, setNotifListener] = useState(false);
@@ -219,19 +221,15 @@ export default function SettingsScreen() {
         {/* ── Fuentes de Datos ── */}
         <SectionHeader title="Fuentes de Datos" />
         <SectionCard>
-          <SettingRow
+<          SettingRow
             icon="📧"
             title="Sincronizar Gmail"
-            subtitle={emailSync ? 'Conectado — leyendo emails bancarios' : 'Conecta Gmail para captura automática'}
-            rightElement={
-              <Switch
-                value={emailSync}
-                onValueChange={setEmailSync}
-                trackColor={{ false: colors.border, true: colors.primaryLight }}
-                thumbColor={colors.surface}
-              />
-            }
-          />
+            subtitle="Conecta Gmail para captura automática"
+            onPress={() => router.push('/gmail-connect')}
+            />
+              
+            
+          /
           <SettingRow
             icon="🔔"
             title="Leer notificaciones (Android)"

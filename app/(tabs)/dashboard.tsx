@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { colors, spacing, borderRadius, fontSize } from '../../src/theme/colors';
 import { useStore } from '../../src/store/useStore';
-import NotificationPermissionBanner from '../../src/components/NotificationPermissionBanner';
 
 function formatCOP(amount: number): string {
   return '$' + amount.toLocaleString('es-CO');
@@ -19,135 +19,176 @@ function ProgressBar({ percentage, color }: { percentage: number; color: string 
   );
 }
 
-function CategoryCard({ item }: { item: any }) {
-  const isOverBudget = item.percentage > 100;
-  const isWarning = item.percentage > 80;
-  return (
-    <View style={styles.categoryCard}>
-      <View style={styles.categoryHeader}>
-        <View style={styles.categoryLeft}>
-          <Text style={styles.categoryIcon}>{item.categoryIcon}</Text>
-          <View>
-            <Text style={styles.categoryName}>{item.categoryName}</Text>
-            <Text style={styles.categoryAmount}>
-              {formatCOP(item.spent)} / {formatCOP(item.limit)}
-            </Text>
-          </View>
-        </View>
-        <View style={[
-          styles.percentageBadge,
-          isOverBudget && styles.percentageBadgeRed,
-          isWarning && !isOverBudget && styles.percentageBadgeYellow,
-        ]}>
-          <Text style={[
-            styles.percentageText,
-            isOverBudget && styles.percentageTextRed,
-            isWarning && !isOverBudget && styles.percentageTextYellow,
-          ]}>
-            {Math.round(item.percentage)}%
-          </Text>
-        </View>
-      </View>
-      <ProgressBar percentage={item.percentage} color={item.categoryColor} />
-    </View>
-  );
-}
-
 export default function DashboardScreen() {
-  const { getMonthlyStats, activeBudget } = useStore();
-  const stats = getMonthlyStats();
+  const router = useRouter();
+  const { activeBudget, transactions, budgets, setActiveBudget } = useStore();
+
+  if (!activeBudget) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyEmoji}>📊</Text>
+          <Text style={styles.emptyTitle}>Sin presupuesto activo</Text>
+          <Text style={styles.emptySubtitle}>Crea o selecciona un presupuesto para ver tu resumen</Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(tabs)/')}>
+            <Text style={styles.emptyButtonText}>Ir a Mis presupuestos</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Calcular gastos por categoría desde transacciones
+  const now = new Date();
+  const monthTransactions = transactions.filter(t => {
+    const d = new Date(t.date);
+    return d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear() &&
+      t.budgetId === activeBudget.id;
+  });
+
+  const totalIncome = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenses = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const balance = totalIncome - totalExpenses;
+
+  // Gastos por categoría
+  const categorySpending = activeBudget.categories.map(cat => {
+    const spent = monthTransactions
+      .filter(t => t.categoryId === cat.id && t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const percentage = cat.monthlyLimit > 0 ? (spent / cat.monthlyLimit) * 100 : 0;
+    return { ...cat, spent, percentage };
+  });
+
+  const totalLimit = activeBudget.categories.reduce((sum, c) => sum + c.monthlyLimit, 0);
+  const totalPercentage = totalLimit > 0 ? (totalExpenses / totalLimit) * 100 : 0;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
+
+        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.greeting}>Buenos dias 👋</Text>
-          <Text style={styles.title}>Tu Resumen de Abril</Text>
+          <Text style={styles.headerTitle}>📊 Resumen</Text>
+          <Text style={styles.headerSubtitle}>{activeBudget.name}</Text>
         </View>
 
+        {/* Balance Card */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceRow}>
             <View style={styles.balanceItem}>
               <Text style={styles.balanceLabel}>Ingresos</Text>
               <Text style={[styles.balanceValue, { color: colors.income }]}>
-                {formatCOP(stats.totalIncome)}
+                {formatCOP(totalIncome)}
               </Text>
             </View>
             <View style={styles.balanceDivider} />
             <View style={styles.balanceItem}>
               <Text style={styles.balanceLabel}>Gastos</Text>
               <Text style={[styles.balanceValue, { color: colors.expense }]}>
-                {formatCOP(stats.totalExpenses)}
+                {formatCOP(totalExpenses)}
               </Text>
             </View>
           </View>
           <View style={styles.balanceTotal}>
             <Text style={styles.balanceTotalLabel}>Balance del Mes</Text>
-            <Text style={[
-              styles.balanceTotalValue,
-              { color: stats.balance >= 0 ? colors.income : colors.expense }
-            ]}>
-              {stats.balance >= 0 ? '+' : ''}{formatCOP(stats.balance)}
+            <Text style={[styles.balanceTotalValue, { color: balance >= 0 ? colors.income : colors.expense }]}>
+              {balance >= 0 ? '+' : ''}{formatCOP(balance)}
             </Text>
           </View>
         </View>
 
-        <NotificationPermissionBanner />
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📊 Progreso del Presupuesto</Text>
-          <Text style={styles.sectionSubtitle}>
-            {activeBudget?.name || 'Sin presupuesto activo'}
-          </Text>
-
-          <View style={styles.overallProgress}>
-            <View style={styles.overallRow}>
-              <Text style={styles.overallLabel}>Gastado del total</Text>
-              <Text style={styles.overallAmount}>
-                {formatCOP(stats.totalExpenses)} / {formatCOP(activeBudget?.totalLimit || 0)}
-              </Text>
+        {/* Progreso general */}
+        {totalLimit > 0 && (
+          <View style={styles.section}>
+            <View style={styles.overallProgress}>
+              <View style={styles.overallRow}>
+                <Text style={styles.overallLabel}>Gastado del total</Text>
+                <Text style={styles.overallAmount}>
+                  {formatCOP(totalExpenses)} / {formatCOP(totalLimit)}
+                </Text>
+              </View>
+              <ProgressBar percentage={totalPercentage} color={colors.primaryLight} />
+              <Text style={styles.overallPct}>{Math.round(totalPercentage)}% utilizado</Text>
             </View>
-            <ProgressBar
-              percentage={activeBudget?.totalLimit ? (stats.totalExpenses / activeBudget.totalLimit) * 100 : 0}
-              color={colors.primaryLight}
-            />
           </View>
+        )}
 
-          {stats.categoryBreakdown.map((item) => (
-            <CategoryCard key={item.categoryId} item={item} />
-          ))}
+        {/* Categorías */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Por categoría</Text>
+
+          {categorySpending.length === 0 ? (
+            <View style={styles.noCategoriesBox}>
+              <Text style={styles.noCategoriesText}>No hay categorías en este presupuesto.</Text>
+              <TouchableOpacity onPress={() => router.push('/chat')}>
+                <Text style={styles.noCategoriesLink}>Ir al chat para agregar →</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            categorySpending.map((cat) => {
+              const isOver = cat.percentage > 100;
+              const isWarning = cat.percentage > 80;
+              return (
+                <View key={cat.id} style={styles.categoryCard}>
+                  <View style={styles.categoryHeader}>
+                    <View style={styles.categoryLeft}>
+                      <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                      <View>
+                        <Text style={styles.categoryName}>{cat.name}</Text>
+                        <Text style={styles.categoryAmount}>
+                          {formatCOP(cat.spent)}
+                          {cat.monthlyLimit > 0 ? ` / ${formatCOP(cat.monthlyLimit)}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                    {cat.monthlyLimit > 0 && (
+                      <View style={[
+                        styles.badge,
+                        isOver && styles.badgeRed,
+                        isWarning && !isOver && styles.badgeYellow,
+                      ]}>
+                        <Text style={[
+                          styles.badgeText,
+                          isOver && styles.badgeTextRed,
+                          isWarning && !isOver && styles.badgeTextYellow,
+                        ]}>
+                          {Math.round(cat.percentage)}%
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  {cat.monthlyLimit > 0 && (
+                    <ProgressBar percentage={cat.percentage} color={cat.color} />
+                  )}
+                  {cat.monthlyLimit === 0 && cat.spent > 0 && (
+                    <Text style={styles.noLimit}>Gastado: {formatCOP(cat.spent)} · Sin límite definido</Text>
+                  )}
+                </View>
+              );
+            })
+          )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💡 Insights de FinanzAI</Text>
-          <View style={styles.insightCard}>
-            <Text style={styles.insightIcon}>⚠️</Text>
-            <View style={styles.insightContent}>
-              <Text style={styles.insightTitle}>Servicios casi al limite</Text>
-              <Text style={styles.insightText}>
-                Has gastado el 90% de tu presupuesto de servicios. Te quedan $50,000 para el resto del mes.
-              </Text>
-            </View>
+        {/* Otros presupuestos */}
+        {budgets.length > 1 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Otros presupuestos</Text>
+            {budgets.filter(b => b.id !== activeBudget.id).map(b => (
+              <TouchableOpacity
+                key={b.id}
+                style={styles.otherBudget}
+                onPress={() => setActiveBudget(b)}
+              >
+                <View>
+                  <Text style={styles.otherBudgetName}>{b.name}</Text>
+                  <Text style={styles.otherBudgetCats}>{b.categories.length} categorías</Text>
+                </View>
+                <Text style={styles.arrow}>›</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-          <View style={styles.insightCard}>
-            <Text style={styles.insightIcon}>🎉</Text>
-            <View style={styles.insightContent}>
-              <Text style={styles.insightTitle}>Meta de ahorro cumplida</Text>
-              <Text style={styles.insightText}>
-                Completaste tu meta de ahorro de $500,000 este mes. ¡Excelente disciplina!
-              </Text>
-            </View>
-          </View>
-          <View style={styles.insightCard}>
-            <Text style={styles.insightIcon}>📉</Text>
-            <View style={styles.insightContent}>
-              <Text style={styles.insightTitle}>Alimentacion bajo control</Text>
-              <Text style={styles.insightText}>
-                Gastas un 8% menos en alimentacion comparado con el mes pasado.
-              </Text>
-            </View>
-          </View>
-        </View>
+        )}
 
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
@@ -157,13 +198,17 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
-  },
-  greeting: { fontSize: fontSize.md, color: colors.textSecondary },
-  title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.text, marginTop: spacing.xs },
+
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  emptyEmoji: { fontSize: 56, marginBottom: spacing.md },
+  emptyTitle: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
+  emptySubtitle: { fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.xl },
+  emptyButton: { backgroundColor: colors.primary, borderRadius: borderRadius.md, padding: spacing.md, paddingHorizontal: spacing.xl },
+  emptyButtonText: { fontSize: fontSize.md, fontWeight: '700', color: '#FFF' },
+
+  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md },
+  headerTitle: { fontSize: fontSize.xxl, fontWeight: '800', color: colors.text },
+  headerSubtitle: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: spacing.xs },
 
   balanceCard: {
     marginHorizontal: spacing.lg,
@@ -188,20 +233,19 @@ const styles = StyleSheet.create({
   balanceTotalValue: { fontSize: fontSize.xxl, fontWeight: '800', marginTop: spacing.xs },
 
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
-  sectionTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
-  sectionSubtitle: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.md },
+  sectionTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
 
   overallProgress: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
-    marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
   },
   overallRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   overallLabel: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: '600' },
   overallAmount: { fontSize: fontSize.sm, color: colors.text, fontWeight: '700' },
+  overallPct: { fontSize: fontSize.xs, color: colors.textTertiary, marginTop: spacing.xs, textAlign: 'right' },
 
   categoryCard: {
     backgroundColor: colors.surface,
@@ -216,41 +260,37 @@ const styles = StyleSheet.create({
   categoryIcon: { fontSize: 28 },
   categoryName: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
   categoryAmount: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
-  percentageBadge: {
+  badge: {
     backgroundColor: colors.divider,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
   },
-  percentageBadgeYellow: { backgroundColor: '#FEF3C7' },
-  percentageBadgeRed: { backgroundColor: '#FEE2E2' },
-  percentageText: { fontSize: fontSize.sm, fontWeight: '700', color: colors.textSecondary },
-  percentageTextYellow: { color: '#D97706' },
-  percentageTextRed: { color: '#DC2626' },
+  badgeYellow: { backgroundColor: '#FEF3C7' },
+  badgeRed: { backgroundColor: '#FEE2E2' },
+  badgeText: { fontSize: fontSize.sm, fontWeight: '700', color: colors.textSecondary },
+  badgeTextYellow: { color: '#D97706' },
+  badgeTextRed: { color: '#DC2626' },
+  noLimit: { fontSize: fontSize.xs, color: colors.textTertiary, marginTop: spacing.xs },
+  noCategoriesBox: { backgroundColor: colors.surface, borderRadius: borderRadius.md, padding: spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  noCategoriesText: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.sm },
+  noCategoriesLink: { fontSize: fontSize.sm, color: colors.primaryLight, fontWeight: '600' },
 
-  progressBarBg: {
-    height: 8,
-    backgroundColor: colors.divider,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: 8,
-    borderRadius: 4,
-  },
+  progressBarBg: { height: 8, backgroundColor: colors.divider, borderRadius: 4, overflow: 'hidden' },
+  progressBarFill: { height: 8, borderRadius: 4 },
 
-  insightCard: {
+  otherBudget: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.sm,
   },
-  insightIcon: { fontSize: 24, marginTop: 2 },
-  insightContent: { flex: 1 },
-  insightTitle: { fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs },
-  insightText: { fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
+  otherBudgetName: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
+  otherBudgetCats: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  arrow: { fontSize: 24, color: colors.textTertiary },
 });
