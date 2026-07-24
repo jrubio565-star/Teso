@@ -33,7 +33,8 @@
       "expo-router",
       "./plugins/withAndroidNotificationListener",
       "expo-secure-store",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
